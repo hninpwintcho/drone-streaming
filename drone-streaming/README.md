@@ -322,3 +322,91 @@ VLC (RTSP):          rtsp://RTSP_IP:554/drone_stream
 
 Python OpenCV (AI):  cv2.VideoCapture('rtsp://RTSP_IP:554/drone_stream')
 ```
+
+---
+
+### Q3: Are RTMP and RTSP real-time?
+
+**Near real-time — but NOT the same as Janus/WebRTC.**
+
+| Protocol | Latency | Real-time? |
+|----------|---------|------------|
+| **Janus (WebRTC)** | < 500ms | ✅ True real-time |
+| **RTSP (MediaMTX)** | 1–3 seconds | ⚡ Near real-time |
+| **RTMP (node-media-server)** | 2–5 seconds | ⚡ Near real-time |
+| **HLS (from RTMP)** | 6–12 seconds | ❌ Delayed (segmented) |
+
+**Why latency differs:**
+
+```
+WebRTC (Janus):   Drone → RTP/UDP → Janus → Browser     < 500ms  ✅
+RTSP:             Drone → RTSP → MediaMTX → buffer → viewer  1-3s
+RTMP → HLS:       Drone → RTMP → cut 2s segments → viewer    2-5s
+```
+
+**Which to use for AI Detection:**
+
+| Use Case | Best Choice |
+|----------|-------------|
+| AI detection (real-time alert) | ✅ **Janus** (< 500ms) |
+| AI via Python OpenCV | ✅ **RTSP** (1–3s, acceptable) |
+| Live broadcast, many viewers | ✅ **RTMP → HLS** |
+| NVR / Auto-Recording | ✅ **RTSP** (MediaMTX auto-record MP4) |
+
+---
+
+### Q4: What is OpenCV AI?
+
+**OpenCV** (Open Source Computer Vision) is a Python library that reads video frames from RTSP stream and runs AI detection on each frame.
+
+**How it works with RTSP:**
+
+```
+Drone
+  │ GStreamer
+  ▼
+MediaMTX (:554 RTSP)
+  │ rtsp:// stream
+  ▼
+Python + OpenCV
+  │ frame by frame
+  ▼
+AI Detection (YOLO, face, object tracking...)
+```
+
+**Python example:**
+
+```python
+import cv2
+
+# Connect to RTSP stream from MediaMTX
+cap = cv2.VideoCapture('rtsp://YOUR_IP:554/drone_stream')
+
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        break
+
+    # Run YOLO AI detection on each frame
+    results = model(frame)          # detect person, car, drone
+    annotated = results[0].plot()   # draw bounding box
+
+    cv2.imshow('Drone AI', annotated)
+    if cv2.waitKey(1) == ord('q'):
+        break
+```
+
+**Install:**
+
+```bash
+pip install opencv-python ultralytics   # YOLO + OpenCV
+```
+
+**OpenCV vs Janus for AI:**
+
+| | Janus (WebRTC) | OpenCV + RTSP |
+|--|---|---|
+| Language | JavaScript (browser) | Python |
+| AI model | Browser-side (TensorFlow.js) | Server-side (YOLO, PyTorch) |
+| Latency | < 500ms | 1–3s |
+| Best for | Real-time browser alert | Heavy server-side AI |
