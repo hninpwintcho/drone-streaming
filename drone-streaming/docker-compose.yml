@@ -1,0 +1,60 @@
+version: "3.9"
+
+# ================================================================
+# Drone Streaming Stack — Docker Only (AWS EC2)
+# RTMP: node-media-server  |  RTSP: MediaMTX
+#
+# Commands:
+#   docker compose up -d        ← start
+#   docker compose logs -f      ← watch logs
+#   docker compose down         ← stop
+#   docker compose ps           ← status
+# ================================================================
+
+services:
+
+  # ── RTMP Server (node-media-server) ──────────────────
+  rtmp-server:
+    build:
+      context: ./rtmp-server
+    container_name: drone-rtmp
+    restart: unless-stopped
+    ports:
+      - "1935:1935"     # RTMP ingest  ← drone pushes here
+      - "8000:8000"     # HTTP API + HLS
+    environment:
+      RTMP_PORT: 1935
+      HTTP_PORT: 8000
+      API_PASS: ${API_PASS:-admin123}
+    volumes:
+      - hls_data:/app/media
+    networks:
+      - drone-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8000/api/streams"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # ── RTSP Server (MediaMTX) ───────────────────────────
+  rtsp-server:
+    image: bluenviron/mediamtx:latest
+    container_name: drone-rtsp
+    restart: unless-stopped
+    ports:
+      - "554:8554"      # RTSP  ← VLC / NVR / OpenCV
+      - "8888:8888"     # HLS from MediaMTX
+    volumes:
+      - ./rtsp-server/mediamtx.yml:/mediamtx.yml:ro
+      - rtsp_recordings:/recordings
+    networks:
+      - drone-net
+
+volumes:
+  hls_data:
+  rtsp_recordings:
+
+networks:
+  drone-net:
+    driver: bridge

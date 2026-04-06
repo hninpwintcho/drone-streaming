@@ -1,0 +1,27 @@
+logLevel: info
+
+# Ports inside container
+rtspAddress: :8554
+rtmpAddress: :1935
+hlsAddress: :8888
+webrtc: no
+
+paths:
+  # Drone main stream
+  drone_stream:
+    publishUser: drone
+    publishPass: droneSecret2024!
+    readUser: ""
+    readPass: ""
+    record: yes
+    recordPath: /recordings/%Y/%m/%d/%H%M%S-%f
+    recordFormat: fmp4
+    recordSegmentDuration: 1h0m0s
+
+  # Test/debug (no auth)
+  test:
+    publishUser: ""
+    publishPass: ""
+    readUser: ""
+    readPass: ""
+    record: no
