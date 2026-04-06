@@ -258,3 +258,67 @@ docker compose restart        # restart
 |------|---------|
 | **[janus-streaming-server](https://github.com/Augustine423/janus-streaming-server)** | Janus WebRTC (real-time AI, existing) |
 | **This repo: drone-streaming** | RTMP (node-media-server) + RTSP (MediaMTX) — boss requirement |
+
+---
+
+## ❓ FAQ
+
+### Q1: RTSP and RTMP use the same port as Janus (UDP 5001–5100)?
+
+**No — completely different connections and ports.**
+
+| Server | Protocol | Port | Connection |
+|--------|----------|------|------------|
+| **Janus** | RTP / UDP | **5001–5100** | UDP packets |
+| **RTMP** | RTMP / TCP | **1935** | TCP stream |
+| **RTSP** | RTSP / TCP | **554** | TCP stream |
+
+UDP 5001–5100 is **Janus only**. RTMP and RTSP use separate TCP ports.
+
+```
+Drone GStreamer
+   ├──► udpsink port=5001   → Janus    (UDP, AI real-time)
+   ├──► rtmpsink port=1935  → RTMP     (TCP, broadcast)
+   └──► rtspclientsink :554 → RTSP     (TCP, NVR/record)
+```
+
+**For AI Detection:**
+
+| | Janus (UDP 5001-5100) | RTSP (TCP 554) | RTMP (TCP 1935) |
+|--|---|---|---|
+| AI use | ✅ Best (< 500ms) | ✅ OK via OpenCV | ❌ Not suitable |
+| AI tool | Janus JS SDK | `cv2.VideoCapture('rtsp://...')` | — |
+
+---
+
+### Q2: Do viewers need to install anything? Is Janus JS SDK included?
+
+**Janus JS SDK is already bundled inside the Docker image** — no install needed.
+
+From `Dockerfile`:
+```dockerfile
+RUN cp -r /opt/janus/share/janus/html/* /var/www/html/
+```
+
+**Viewer requirements per server:**
+
+| Server | Viewer | Install needed? |
+|--------|--------|----------------|
+| **Janus** | Browser | ❌ None — JS SDK built into Docker |
+| **RTMP → HLS** | Browser | ❌ None — open `.m3u8` URL |
+| **RTMP → HLS** | VLC | ✅ VLC (free) |
+| **RTSP** | VLC | ✅ VLC (free) |
+| **RTSP → HLS** | Browser | ❌ None — port 8888 |
+| **RTSP AI** | Python | ✅ `pip install opencv-python` |
+
+**Watch URLs — no install required:**
+
+```
+Browser (Janus):     https://JANUS_IP
+Browser (RTMP HLS):  http://RTMP_IP:8000/live/drone_stream/index.m3u8
+Browser (RTSP HLS):  http://RTSP_IP:8888/drone_stream/index.m3u8
+
+VLC (RTSP):          rtsp://RTSP_IP:554/drone_stream
+
+Python OpenCV (AI):  cv2.VideoCapture('rtsp://RTSP_IP:554/drone_stream')
+```
